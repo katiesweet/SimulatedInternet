@@ -1,0 +1,17 @@
+Nodes intrinsic characteristics:
+- Geolocation
+- Speed/Mbyte per transaction
+- Max capacity
+- Utility function - speed preference and cost preference
+
+Variable:
+- Cost per Mbyte
+
+
+Intrinsic.csv:
+A, lat, lon, speed, capacity, speedPref, costPref
+
+
+Connections.csv
+A,b
+B,c
