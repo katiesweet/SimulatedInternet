@@ -188,7 +188,7 @@ class Network():
         return bestPath
 
     def sendMessageAgentWise(self, start, end, size, content):
-        print "\nSENDING MESSAGE AGENT WISE FROM ", start, " TO ", end
+        print("\nSENDING MESSAGE AGENT WISE FROM ", start, " TO ", end)
         message = Message(start,
                           end,
                           self.nodes[start].speedPref,
@@ -196,14 +196,14 @@ class Network():
                           size,
                           content)
         path = self.getPath(message)
-        print path
+        print(path)
 
         if path:
             self.transmitMessageAndPayment(message, path)
 
 
     def sendMessage(self, start, end, size, content):
-        print "\nSENDING MESSAGE FROM ", start, " TO ", end
+        print("\nSENDING MESSAGE FROM ", start, " TO ", end)
         message = Message(start,
                           end,
                           self.nodes[start].speedPref,
@@ -213,26 +213,26 @@ class Network():
 
         # Get path
         path = self.aStarAlgorithm(message)
-        print path
+        print(path)
 
         if path:
             self.transmitMessageAndPayment(message, path)
 
     def transmitMessageAndPayment(self, message, remainingPath):
         if len(remainingPath) <= 0:
-            print "ERROR!"
+            print("ERROR!")
 
         # Handle your own payment
         currNode, currPayment = remainingPath[-1]
         self.nodes[currNode].balance += currPayment
-        print "Node ", currNode, " has a current balance of: ", self.nodes[currNode].balance
+        print("Node ", currNode, " has a current balance of: ", self.nodes[currNode].balance)
 
         # Remove yourself from the path
         remainingPath.pop()
 
         # If you are the receiver, report. Else, continue transmitting.
         if currNode == message.endingNode:
-            print "Node ", currNode, " received message: ", message.content
+            print("Node ", currNode, " received message: ", message.content)
         else:
             return self.transmitMessageAndPayment(message, remainingPath)
 
