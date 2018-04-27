@@ -2,6 +2,7 @@ import networkx as nx
 import matplotlib.pyplot as pyplot
 import csv
 import math
+import copy
 
 
 class Node():
@@ -57,14 +58,49 @@ class Network():
 
 
     # TODO: Make this more interesting
-    def utilityFunction(self, message, node1, node2):
+    # def utilityFunction(self, message, node1, node2):
+    def utilityFunction(self, message, node):
         speedPref = message.speedPref
         costPref = message.costPref
         size = message.size
 
-        return speedPref * self.nodes[node2].speed + costPref * self.nodes[node2].costPerMByte * size
+        return speedPref * self.nodes[node].speed + costPref * self.nodes[node].costPerMByte * size
+
+
+    # More of an agent based approach to the shortest path
+    def getBid(self, current, message, visitedNodes):
+        bestNeighbor = {'path': [], 'utility': float('inf'), 'totalCost': float('inf')}
+
+        # Visit current node, and generate current nodes cost and utility
+        currentVisitedNodes = copy.deepcopy(visitedNodes)
+        currentVisitedNodes.append(current)
+
+        myCost = self.nodes[current].costPerMByte * message.size
+        myUtility = self.utilityFunction(message, current)
+
+        # Get bids from other neighbors, and append yours on
+        notVisitedNeighbors = list(set(self.graph.neighbors(current)) - set(visitedNodes))
+        for neighbor in notVisitedNeighbors:
+
+            # If neighbor is the destination
+            if neighbor == message.endingNode:
+                path = [(message.endingNode, 0)] # Ending node is final destination, and they charge nothing
+                path.append((current, myCost))
+                return { 'path' : path, 'utility' : myUtility, 'totalCost' : myCost}
+            
+            # Else
+            neighborsOffer = self.getBid(neighbor, message, currentVisitedNodes)
+            if neighborsOffer['utility'] < bestNeighbor['utility']:
+                bestNeighbor = neighborsOffer
+
+        # Now that we have our neighbors best offer, we can add ourself to it
+        myOffer = {'path' : bestNeighbor['path'] + [(current, myCost)],
+                   'utility' : bestNeighbor['utility'] + myUtility,
+                   'totalCost' : bestNeighbor['totalCost'] + myCost}
+        return myOffer
 
     # Based on the pseudocode given at : https://en.wikipedia.org/wiki/A*_search_algorithm
+    # Requires some central understanding
     def aStarAlgorithm(self, message):
         # Set of nodes already evaluation
         closedSet = []        
@@ -110,7 +146,7 @@ class Network():
                 
                 # The distance from start to a neighbor
                 # For our application, this is the utility function
-                tentative_gScore = gScores[current] + self.utilityFunction(message, current, neighbor)
+                tentative_gScore = gScores[current] + self.utilityFunction(message, neighbor)
 
                 if tentative_gScore >= gScores[neighbor]:
                     continue # This is not a better path
@@ -123,8 +159,9 @@ class Network():
         return False # Signal for failure for now
 
     def reconstructPath(self, cameFrom, current, gScores):
+        """ Used in the A* algorithm to reconstruct the path """
         # NOTE: 
-        # - returns totalPath = [('node', changeInBalance), ('node', changeInBalance), ...]
+        # - returns totalPath = [('node', changeInUtility), ('node', changeInUtility), ...]
         # - the first node in totalPath is the destination, last node is the source
         # - Currently, the receiving node is also charging for the transmission
         # - The last node in the list (sending node) changeInBalance should be equal
@@ -141,6 +178,31 @@ class Network():
 
         totalPath.append((current, -1*totalCost))
         return totalPath
+
+    def getPath(self, message):
+        bestBid = {'path': [], 'utility': float('inf'), 'totalCost': float('inf')}
+        for neighbor in self.graph.neighbors(message.startingNode):
+            bid = self.getBid(neighbor, message, [message.startingNode])
+            if bid['utility'] < bestBid['utility']:
+                bestBid = bid
+
+        bestPath = bestBid['path'] + [(message.startingNode, -1*bestBid['totalCost'])]
+        return bestPath
+
+    def sendMessageAgentWise(self, start, end, size, content):
+        print "\nSENDING MESSAGE AGENT WISE FROM ", start, " TO ", end
+        message = Message(start,
+                          end,
+                          self.nodes[start].speedPref,
+                          self.nodes[start].costPref,
+                          size,
+                          content)
+        path = self.getPath(message)
+        print path
+
+        if path:
+            self.transmitMessageAndPayment(message, path)
+
 
     def sendMessage(self, start, end, size, content):
         print "\nSENDING MESSAGE FROM ", start, " TO ", end
@@ -179,6 +241,8 @@ class Network():
 network = Network()
 
 network.sendMessage('D', 'M', 1, "Hello!")
+network.sendMessageAgentWise('D', 'M', 1, 'Agent Hello!')
 network.sendMessage('M', 'T', 2, "Hello 2!")
+network.sendMessageAgentWise('M', 'T', 2, 'Agent Hello 2!')
 
 network.draw()
