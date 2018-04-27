@@ -69,26 +69,23 @@ class Network():
 
     # More of an agent based approach to the shortest path
     def getBid(self, current, message, visitedNodes):
-        bestNeighbor = {'path': [], 'utility': float('inf'), 'totalCost': float('inf')}
+        myCost = self.nodes[current].costPerMByte * message.size
+        myUtility = self.utilityFunction(message, current)
+
+        # If current is message recipient, we are done
+        if current == message.endingNode:
+            return {'path': [(message.endingNode, myCost)],
+                    'utility': myUtility,
+                    'totalCost': myCost}
 
         # Visit current node, and generate current nodes cost and utility
         currentVisitedNodes = copy.deepcopy(visitedNodes)
         currentVisitedNodes.append(current)
 
-        myCost = self.nodes[current].costPerMByte * message.size
-        myUtility = self.utilityFunction(message, current)
-
-        # Get bids from other neighbors, and append yours on
-        notVisitedNeighbors = list(set(self.graph.neighbors(current)) - set(visitedNodes))
+        # Get neighbors best bid
+        bestNeighbor = {'path': [], 'utility': float('inf'), 'totalCost': float('inf')}
+        notVisitedNeighbors = list(set(self.graph.neighbors(current)) - set(currentVisitedNodes))
         for neighbor in notVisitedNeighbors:
-
-            # If neighbor is the destination
-            if neighbor == message.endingNode:
-                path = [(message.endingNode, 0)] # Ending node is final destination, and they charge nothing
-                path.append((current, myCost))
-                return { 'path' : path, 'utility' : myUtility, 'totalCost' : myCost}
-            
-            # Else
             neighborsOffer = self.getBid(neighbor, message, currentVisitedNodes)
             if neighborsOffer['utility'] < bestNeighbor['utility']:
                 bestNeighbor = neighborsOffer
@@ -98,6 +95,7 @@ class Network():
                    'utility' : bestNeighbor['utility'] + myUtility,
                    'totalCost' : bestNeighbor['totalCost'] + myCost}
         return myOffer
+
 
     # Based on the pseudocode given at : https://en.wikipedia.org/wiki/A*_search_algorithm
     # Requires some central understanding
