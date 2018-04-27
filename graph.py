@@ -12,22 +12,34 @@ class Node():
         self.lat = float(node[1])
         self.long = float(node[2])
         self.speed = float(node[3])
-        self.capacity = float(node[4])
         self.speedPref = float(node[5])
         self.costPref = float(node[6]) 
         self.costPerMByte = float(node[7])
-        self.balance = 1000
+        self.balance = 0
+        self.numMessagesSent = 0
+
+    def createMessage(self, destination, size, content):
+        self.numMessagesSent += 1
+        message = Message(self.name,
+                          destination,
+                          self.speedPref,
+                          self.costPref,
+                          size,
+                          content,
+                          (self.name, self.numMessagesSent)
+                         )
+        return message
 
 
 class Message():
-    def __init__(self, startingNode, endingNode, speedPref, costPref, size, content):
+    def __init__(self, startingNode, endingNode, speedPref, costPref, size, content, messageId):
         self.startingNode = startingNode
         self.endingNode = endingNode
         self.speedPref = speedPref
         self.costPref = costPref
         self.size = size
         self.content = content
-
+        self.messageId = messageId
 
 class Network():
     def __init__(self):
@@ -56,12 +68,7 @@ class Network():
         for algorithm in self.algorithms:
             print("\nUsing algorithm type: ", algorithm.name)
             startNode = self.graph.nodes[start]['node']
-            message = Message(start,
-                            end,
-                            startNode.speedPref,
-                            startNode.costPref,
-                            size,
-                            content)
+            message = startNode.createMessage(end, size, content)
 
             # Get path
             path = algorithm.getPath(self.graph, message)

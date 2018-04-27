@@ -27,7 +27,7 @@ class PathFindingAlgorithm:
         costPref = message.costPref
         size = message.size
 
-        return speedPref * node.speed + costPref * node.costPerMByte * size
+        return speedPref * node.speed * size + costPref * node.costPerMByte * size 
 
     def getNode(self, graph, nodeName):
         return graph.node[nodeName]['node']
@@ -67,7 +67,7 @@ class AStarAlgorithm(PathFindingAlgorithm):
             current = min(currFScores, key=currFScores.get)
 
             if current == message.endingNode:
-                return self.reconstructPath(cameFrom, current, gScores)
+                return self.reconstructPath(cameFrom, current, graph, message)
             
             openSet.remove(current)
             closedSet.append(current)
@@ -94,7 +94,7 @@ class AStarAlgorithm(PathFindingAlgorithm):
 
         return False # Signal for failure for now   
     
-    def reconstructPath(self, cameFrom, current, gScores):
+    def reconstructPath(self, cameFrom, current, graph, message):
         """ Used in the A* algorithm to reconstruct the path """
         # NOTE: 
         # - returns totalPath = [('node', changeInUtility), ('node', changeInUtility), ...]
@@ -104,16 +104,21 @@ class AStarAlgorithm(PathFindingAlgorithm):
         #   to the -1 * the sum of all other nodes changeInBalance
         #   (i.e. the last node pays, transmission nodes gain)
 
-        totalCost = gScores[current]
+        totalCost = 0
         totalPath = []
         while current in cameFrom:
             nextInPath = cameFrom[current]
-            currentsTake = gScores[current] - gScores[nextInPath]
+            currentsTake = self.getChargedCost(graph, message, current)
+            totalCost += currentsTake
             totalPath.append((current, currentsTake))
             current = nextInPath
 
         totalPath.append((current, -1*totalCost))
         return totalPath
+
+    def getChargedCost(self, graph, message, current):
+        node = self.getNode(graph, current)
+        return node.costPerMByte * message.size
 
 
 class AgentApproach(PathFindingAlgorithm):
