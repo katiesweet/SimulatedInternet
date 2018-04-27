@@ -31,7 +31,6 @@ class Network():
     def __init__(self):
         self.graph = nx.Graph()
         self.nodes = {}
-        self.currentSendingNode = '' # Workaround for now - only works if only one message at a time
 
         with open('Intrinsic.csv') as nodeFile:
             nodes = csv.reader(nodeFile)
@@ -46,7 +45,6 @@ class Network():
                 self.graph.add_edge(c[0], c[1], dist=self.euclideanDistance(c[0], c[1]))
 
     def draw(self):
-        # print(self.graph.nodes(data=True))
         pos = nx.get_node_attributes(self.graph, 'pos')
         nx.draw(self.graph, pos, with_labels=True)
         pyplot.show()
@@ -144,7 +142,6 @@ class Network():
         totalPath.append((current, -1*totalCost))
         return totalPath
 
-    # Pseudocode
     def sendMessage(self, start, end, size, content):
         print "\nSENDING MESSAGE FROM ", start, " TO ", end
         message = Message(start,
