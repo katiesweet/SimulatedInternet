@@ -63,6 +63,9 @@ class AStarAlgorithm(PathFindingAlgorithm):
         fScores[message.startingNode] = self.euclideanDistance(
             graph, message.startingNode, message.endingNode)
 
+        messageSender = message.messageId[0]
+        messageId = message.messageId[1]
+
         while len(openSet) > 0:
             currFScores = {node: fScores[node] for node in openSet}
             current = min(currFScores, key=currFScores.get)
@@ -82,9 +85,13 @@ class AStarAlgorithm(PathFindingAlgorithm):
 
                 # The distance from start to a neighbor
                 # For our application, this is the utility function
-                neighborNode = graph.node[neighbor]['node']
+                neighborNode = self.getNode(graph, neighbor)
                 tentative_gScore = gScores[current] + \
                     self.utilityFunction(message, neighborNode)
+
+                if messageSender not in neighborNode.messagesSeen or messageId != neighborNode.messagesSeen[messageSender]:
+                    neighborNode.messagesSeen[messageSender] = messageId
+                    neighborNode.numMessagesSeen += 1
 
                 if tentative_gScore >= gScores[neighbor]:
                     continue  # This is not a better path
@@ -157,9 +164,10 @@ class AgentApproach(PathFindingAlgorithm):
             'inf'), 'totalCost': float('inf')}
         notVisitedNeighbors = list(
             set(graph.neighbors(current)) - set(currentVisitedNodes))
+
+        messageSender = message.messageId[0]
+        messageId = message.messageId[1]
         for neighbor in notVisitedNeighbors:
-            messageSender = message.messageId[0]
-            messageId = message.messageId[1]
             neighborNode = self.getNode(graph, neighbor)
             if messageSender not in neighborNode.messagesSeen or messageId != neighborNode.messagesSeen[messageSender]:
                 neighborNode.messagesSeen[messageSender] = messageId
@@ -179,7 +187,8 @@ class AgentApproach(PathFindingAlgorithm):
 
 class AgentApproximation(PathFindingAlgorithm):
     def getPath(self, graph, message):
-        validPath, path = self.findApproximatePath(graph, message, message.startingNode, [])
+        validPath, path = self.findApproximatePath(
+            graph, message, message.startingNode, [])
         return path
 
     def findApproximatePath(self, graph, message, currentNode, visitedNodes):
@@ -188,7 +197,7 @@ class AgentApproximation(PathFindingAlgorithm):
 
         # If the current node is the ending node, we are done
         if currentNode == message.endingNode:
-            return True, [(currentNode, myPrice)] # True means reached end
+            return True, [(currentNode, myPrice)]  # True means reached end
 
         # Deep copy currentVisitedNodes, just in case we backtrack
         currentVisitedNodes = copy.deepcopy(visitedNodes)
@@ -199,22 +208,33 @@ class AgentApproximation(PathFindingAlgorithm):
         neighborApproximations = {}
         notVisitedNeighbors = list(
             set(graph.neighbors(currentNode)) - set(currentVisitedNodes))
+
+        messageSender = message.messageId[0]
+        messageId = message.messageId[1]
         for neighbor in notVisitedNeighbors:
-            neighborApproximations[neighbor] = self.getApproximateUtility(graph, message, neighbor)
+            neighborApproximations[neighbor] = self.getApproximateUtility(
+                graph, message, neighbor)
+
+            neighborNode = self.getNode(graph, neighbor)
+            if messageSender not in neighborNode.messagesSeen or messageId != neighborNode.messagesSeen[messageSender]:
+                neighborNode.messagesSeen[messageSender] = messageId
+                neighborNode.numMessagesSeen += 1
 
         # Find the neighbor with the minimum approximation and try to find a path from that node.
         # If there is a valid path to the end node from that neighbor, we are done, just add ourselves.
         # Otherwise, try going to the next best approximation, until no neighbors are valid
-        while len(neighborApproximations) > 0: 
-            bestApprox = min(neighborApproximations, key=neighborApproximations.get)
-            validPathFound, path = self.findApproximatePath(graph, message, bestApprox, currentVisitedNodes)
+        while len(neighborApproximations) > 0:
+            bestApprox = min(neighborApproximations,
+                             key=neighborApproximations.get)
+            validPathFound, path = self.findApproximatePath(
+                graph, message, bestApprox, currentVisitedNodes)
             if validPathFound:
                 if currentNode == message.startingNode:
                     # If a valid path is found from the starting node,
                     # The price to append on to the path is what it needs pay
                     myPrice = 0
                     for i in range(len(path)):
-                        myPrice -= path[i][1] 
+                        myPrice -= path[i][1]
                 return True, path + [(currentNode, myPrice)]
             neighborApproximations.pop(bestApprox)
 
@@ -224,13 +244,12 @@ class AgentApproximation(PathFindingAlgorithm):
 
     def getApproximateUtility(self, graph, message, node):
         if node == message.endingNode:
-            return -1 # Make sure if you can go straight to the destination, you do
+            return -1  # Make sure if you can go straight to the destination, you do
 
         realNode = self.getNode(graph, node)
         knownUtility = self.utilityFunction(message, realNode)
-        distanceToTarget = self.euclideanDistance(graph, node, message.endingNode)
+        distanceToTarget = self.euclideanDistance(
+            graph, node, message.endingNode)
 
-        return knownUtility + (1 * distanceToTarget) # Scalar may be changed in future
-
-
-        
+        # Scalar may be changed in future
+        return knownUtility + (1 * distanceToTarget)
