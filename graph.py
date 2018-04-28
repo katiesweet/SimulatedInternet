@@ -1,9 +1,13 @@
+import csv
 import networkx as nx
 import matplotlib.pyplot as pyplot
-import csv
-import math
-import copy
 import PathFindingAlgorithm
+
+MIN_MESSAGES_BEFORE_UPDATE = 2
+DECREASE_THRESHOLD = 0.3
+INCREASE_THRESHOLD = 0.7
+DECREASE_AMOUNT = 0.1
+INCREASE_AMOUNT = 0.1
 
 
 class Node():
@@ -13,10 +17,13 @@ class Node():
         self.long = float(node[2])
         self.speed = float(node[3])
         self.speedPref = float(node[5])
-        self.costPref = float(node[6]) 
+        self.costPref = float(node[6])
         self.costPerMByte = float(node[7])
         self.balance = 0
         self.numMessagesSent = 0
+        self.numMessagesSeen = 0
+        self.numMessagesTransmitted = 0
+        self.messagesSeen = {}
 
     def createMessage(self, destination, size, content):
         self.numMessagesSent += 1
@@ -27,8 +34,18 @@ class Node():
                           size,
                           content,
                           (self.name, self.numMessagesSent)
-                         )
+                          )
         return message
+
+    def increasePrice(self):
+        self.numMessageSeen = 0
+        self.numMessagesTransmitted = 0
+        self.costPerMByte += INCREASE_AMOUNT
+
+    def decreasePrice(self):
+        self.numMessageSeen = 0
+        self.numMessagesTransmitted = 0
+        self.costPerMByte -= DECREASE_AMOUNT
 
 
 class Message():
@@ -41,17 +58,20 @@ class Message():
         self.content = content
         self.messageId = messageId
 
+
 class Network():
     def __init__(self):
         self.graph = nx.Graph()
-        self.algorithms = [PathFindingAlgorithm.AStarAlgorithm('A*'),
-                           PathFindingAlgorithm.AgentApproach('Agent')]
+        # self.algorithms = [PathFindingAlgorithm.AStarAlgorithm('A*'),
+        #                    PathFindingAlgorithm.AgentApproach('Agent')]
+        self.algorithms = [PathFindingAlgorithm.AgentApproach('Agent')]
 
         with open('Intrinsic.csv') as nodeFile:
             nodes = csv.reader(nodeFile)
             for n in nodes:
                 node = Node(n)
-                self.graph.add_node(node.name, node=node, pos=(node.long, node.lat))
+                self.graph.add_node(node.name, node=node,
+                                    pos=(node.long, node.lat))
 
         with open('connections.csv') as connectionsFile:
             connections = csv.reader(connectionsFile)
@@ -64,15 +84,15 @@ class Network():
         pyplot.show()
 
     def sendMessage(self, start, end, size, content):
-        print("\nSENDING MESSAGE FROM ", start, " TO ", end)
+        # print("\nSENDING MESSAGE FROM ", start, " TO ", end)
         for algorithm in self.algorithms:
-            print("\nUsing algorithm type: ", algorithm.name)
+            # print("\nUsing algorithm type: ", algorithm.name)
             startNode = self.graph.nodes[start]['node']
             message = startNode.createMessage(end, size, content)
 
             # Get path
             path = algorithm.getPath(self.graph, message)
-            print(path)
+            # print(path)
 
             if path:
                 self.transmitMessageAndPayment(message, path)
@@ -85,20 +105,59 @@ class Network():
         currNode, currPayment = remainingPath[-1]
         actualNode = self.graph.node[currNode]['node']
         actualNode.balance += currPayment
-        print("Node ", currNode, " has a current balance of: ", actualNode.balance)
+        actualNode.numMessagesTransmitted += 1
+        # print("Node ", currNode, " has a current balance of: ", actualNode.balance)
+
+        if actualNode.numMessagesSeen > MIN_MESSAGES_BEFORE_UPDATE:
+            transmissionRate = actualNode.numMessagesTransmitted / actualNode.numMessagesSeen
+
+            if transmissionRate < DECREASE_THRESHOLD:
+                actualNode.decreasePrice()
+            elif transmissionRate > INCREASE_THRESHOLD:
+                actualNode.increasePrice()
 
         # Remove yourself from the path
         remainingPath.pop()
 
         # If you are the receiver, report. Else, continue transmitting.
-        if currNode == message.endingNode:
-            print("Node ", currNode, " received message: ", message.content)
-        else:
+        if currNode != message.endingNode:
+            # print("Node ", currNode, " received message: ", message.content)
+            # else
             return self.transmitMessageAndPayment(message, remainingPath)
+
 
 network = Network()
 
 network.sendMessage('D', 'M', 1, "Hello!")
 network.sendMessage('M', 'T', 2, "Hello 2!")
+network.sendMessage('A', 'C', 1, "Hello!")
+network.sendMessage('C', 'K', 1, "Hello!")
+network.sendMessage('L', 'M', 1, "Hello!")
+network.sendMessage('O', 'M', 1, "Hello!")
+network.sendMessage('D', 'T', 1, "Hello!")
+network.sendMessage('T', 'A', 1, "Hello!")
+network.sendMessage('B', 'R', 1, "Hello!")
+network.sendMessage('E', 'M', 1, "Hello!")
+network.sendMessage('C', 'L', 1, "Hello!")
+network.sendMessage('D', 'K', 1, "Hello!")
+network.sendMessage('B', 'O', 1, "Hello!")
+network.sendMessage('D', 'I', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
+network.sendMessage('A', 'T', 1, "Hello!")
 
-network.draw()
+for nodeName in network.graph.nodes:
+    node = network.graph.nodes[nodeName]['node']
+    print(node.name + ": " + str(node.balance))
+
+# network.draw()
