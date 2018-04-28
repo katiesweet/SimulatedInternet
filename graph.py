@@ -62,9 +62,9 @@ class Message():
 class Network():
     def __init__(self):
         self.graph = nx.Graph()
-        # self.algorithms = [PathFindingAlgorithm.AStarAlgorithm('A*'),
-        #                    PathFindingAlgorithm.AgentApproach('Agent')]
-        self.algorithms = [PathFindingAlgorithm.AgentApproach('Agent')]
+        self.algorithms = [PathFindingAlgorithm.AStarAlgorithm('A*'),
+                           PathFindingAlgorithm.AgentApproach('Agent'),
+                           PathFindingAlgorithm.AgentApproximation('Approximation')]
 
         with open('Intrinsic.csv') as nodeFile:
             nodes = csv.reader(nodeFile)
@@ -84,15 +84,15 @@ class Network():
         pyplot.show()
 
     def sendMessage(self, start, end, size, content):
-        # print("\nSENDING MESSAGE FROM ", start, " TO ", end)
+        print("\nSENDING MESSAGE FROM ", start, " TO ", end)
         for algorithm in self.algorithms:
-            # print("\nUsing algorithm type: ", algorithm.name)
+            print("\nUsing algorithm type: ", algorithm.name)
             startNode = self.graph.nodes[start]['node']
             message = startNode.createMessage(end, size, content)
 
             # Get path
             path = algorithm.getPath(self.graph, message)
-            # print(path)
+            print(path)
 
             if path:
                 self.transmitMessageAndPayment(message, path)
@@ -160,4 +160,4 @@ for nodeName in network.graph.nodes:
     node = network.graph.nodes[nodeName]['node']
     print(node.name + ": " + str(node.balance))
 
-# network.draw()
+network.draw()
