@@ -175,3 +175,53 @@ class AgentApproach(PathFindingAlgorithm):
                    'utility': bestNeighbor['utility'] + myUtility,
                    'totalCost': bestNeighbor['totalCost'] + myCost}
         return myOffer
+
+
+class AgentApproximation(PathFindingAlgorithm):
+    def getPath(self, graph, message):
+        validPath, path = self.findApproximatePath(graph, message, message.startingNode, [])
+        return path
+
+    def findApproximatePath(self, graph, message, currentNode, visitedNodes):
+        myNode = self.getNode(graph, currentNode)
+        myPrice = myNode.costPerMByte * message.size
+
+        if currentNode == message.endingNode:
+            return True, [(currentNode, myPrice)] # True means reached end
+
+        # Visit current node, and generate current nodes cost and utility
+        currentVisitedNodes = copy.deepcopy(visitedNodes)
+        currentVisitedNodes.append(currentNode)
+
+        neighborApproximations = {}
+        notVisitedNeighbors = list(
+            set(graph.neighbors(currentNode)) - set(currentVisitedNodes))
+        for neighbor in notVisitedNeighbors:
+            neighborApproximations[neighbor] = self.getApproximateUtility(graph, message, neighbor)
+
+        while len(neighborApproximations) > 0: 
+            bestApprox = min(neighborApproximations, key=neighborApproximations.get)
+            validPathFound, path = self.findApproximatePath(graph, message, bestApprox, currentVisitedNodes)
+            if validPathFound:
+                if currentNode == message.startingNode:
+                    myPrice = 0
+                    for i in range(len(path)):
+                        myPrice -= path[i][1] 
+                return True, path + [(currentNode, myPrice)]
+            neighborApproximations.pop(bestApprox)
+
+        print('Returned false')
+        return False, []
+
+    def getApproximateUtility(self, graph, message, node):
+        if node == message.endingNode:
+            return -1 # Make sure if you can go straight to the destination, you do
+
+        realNode = self.getNode(graph, node)
+        knownUtility = self.utilityFunction(message, realNode)
+        distanceToTarget = self.euclideanDistance(graph, node, message.endingNode)
+
+        return knownUtility + (1 * distanceToTarget) # Scalar may be changed in future
+
+
+        
