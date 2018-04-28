@@ -1,30 +1,57 @@
 import networkx as nx
 import matplotlib.pyplot as pyplot
 import csv
+import math
+import copy
+import PathFindingAlgorithm
 
 
 class Node():
     def __init__(self, node):
         self.name = node[0]
-        self.lat = node[1]
-        self.long = node[2]
-        self.speed = node[3]
-        self.capacity = node[4]
-        self.speedPref = node[5]
-        self.costPref = node[6]
+        self.lat = float(node[1])
+        self.long = float(node[2])
+        self.speed = float(node[3])
+        self.speedPref = float(node[5])
+        self.costPref = float(node[6]) 
+        self.costPerMByte = float(node[7])
+        self.balance = 0
+        self.numMessagesSent = 0
 
+    def createMessage(self, destination, size, content):
+        self.numMessagesSent += 1
+        message = Message(self.name,
+                          destination,
+                          self.speedPref,
+                          self.costPref,
+                          size,
+                          content,
+                          (self.name, self.numMessagesSent)
+                         )
+        return message
+
+
+class Message():
+    def __init__(self, startingNode, endingNode, speedPref, costPref, size, content, messageId):
+        self.startingNode = startingNode
+        self.endingNode = endingNode
+        self.speedPref = speedPref
+        self.costPref = costPref
+        self.size = size
+        self.content = content
+        self.messageId = messageId
 
 class Network():
     def __init__(self):
-        self.graph = nx.DiGraph()
-        self.nodes = []
+        self.graph = nx.Graph()
+        self.algorithms = [PathFindingAlgorithm.AStarAlgorithm('A*'),
+                           PathFindingAlgorithm.AgentApproach('Agent')]
 
-        with open('nodes.csv') as nodeFile:
+        with open('Intrinsic.csv') as nodeFile:
             nodes = csv.reader(nodeFile)
             for n in nodes:
                 node = Node(n)
-                self.nodes.append((node.name, node))
-                self.graph.add_node(node.name, node=node)
+                self.graph.add_node(node.name, node=node, pos=(node.long, node.lat))
 
         with open('connections.csv') as connectionsFile:
             connections = csv.reader(connectionsFile)
@@ -32,10 +59,46 @@ class Network():
                 self.graph.add_edge(c[0], c[1])
 
     def draw(self):
-        print(self.graph.nodes(data=True))
-        nx.draw(self.graph)
+        pos = nx.get_node_attributes(self.graph, 'pos')
+        nx.draw(self.graph, pos, with_labels=True)
         pyplot.show()
 
+    def sendMessage(self, start, end, size, content):
+        print("\nSENDING MESSAGE FROM ", start, " TO ", end)
+        for algorithm in self.algorithms:
+            print("\nUsing algorithm type: ", algorithm.name)
+            startNode = self.graph.nodes[start]['node']
+            message = startNode.createMessage(end, size, content)
+
+            # Get path
+            path = algorithm.getPath(self.graph, message)
+            print(path)
+
+            if path:
+                self.transmitMessageAndPayment(message, path)
+
+    def transmitMessageAndPayment(self, message, remainingPath):
+        if len(remainingPath) <= 0:
+            print("ERROR!")
+
+        # Handle your own payment
+        currNode, currPayment = remainingPath[-1]
+        actualNode = self.graph.node[currNode]['node']
+        actualNode.balance += currPayment
+        print("Node ", currNode, " has a current balance of: ", actualNode.balance)
+
+        # Remove yourself from the path
+        remainingPath.pop()
+
+        # If you are the receiver, report. Else, continue transmitting.
+        if currNode == message.endingNode:
+            print("Node ", currNode, " received message: ", message.content)
+        else:
+            return self.transmitMessageAndPayment(message, remainingPath)
 
 network = Network()
+
+network.sendMessage('D', 'M', 1, "Hello!")
+network.sendMessage('M', 'T', 2, "Hello 2!")
+
 network.draw()
