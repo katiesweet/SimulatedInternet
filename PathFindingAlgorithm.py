@@ -6,7 +6,7 @@ import copy
 
 class PathFindingAlgorithm:
     def __init__(self, name):
-        self.name = name 
+        self.name = name
 
     @abstractmethod
     def getPath(self, graph, message):
@@ -22,15 +22,15 @@ class PathFindingAlgorithm:
     # TODO: Make this more interesting
     # def utilityFunction(self, message, node1, node2):
     def utilityFunction(self, message, node):
-        
+
         speedPref = message.speedPref
         costPref = message.costPref
         size = message.size
 
-        return speedPref * node.speed * size + costPref * node.costPerMByte * size 
+        return speedPref * node.speed * size + costPref * node.costPerMByte * size
 
     def getNode(self, graph, nodeName):
-        return graph.node[nodeName]['node']
+        return graph.nodes[nodeName]['node']
 
 
 class AStarAlgorithm(PathFindingAlgorithm):
@@ -38,7 +38,7 @@ class AStarAlgorithm(PathFindingAlgorithm):
     # Requires some central understanding
     def getPath(self, graph, message):
         # Set of nodes already evaluation
-        closedSet = []        
+        closedSet = []
 
         # Set of currently discovered nodes that are not evaluated yet
         # Initally only the start node is known
@@ -60,7 +60,8 @@ class AStarAlgorithm(PathFindingAlgorithm):
         fScores = {key: float('inf') for key in nx.nodes(graph)}
 
         # For the first node, the value is completely heuristic
-        fScores[message.startingNode] = self.euclideanDistance(graph, message.startingNode, message.endingNode)
+        fScores[message.startingNode] = self.euclideanDistance(
+            graph, message.startingNode, message.endingNode)
 
         while len(openSet) > 0:
             currFScores = {node: fScores[node] for node in openSet}
@@ -68,35 +69,37 @@ class AStarAlgorithm(PathFindingAlgorithm):
 
             if current == message.endingNode:
                 return self.reconstructPath(cameFrom, current, graph, message)
-            
+
             openSet.remove(current)
             closedSet.append(current)
 
             for neighbor in nx.all_neighbors(graph, current):
                 if neighbor in closedSet:
-                    continue # Ignore the neighbor which is already evaluated
+                    continue  # Ignore the neighbor which is already evaluated
 
                 if neighbor not in openSet:
                     openSet.append(neighbor)
-                
+
                 # The distance from start to a neighbor
                 # For our application, this is the utility function
                 neighborNode = graph.node[neighbor]['node']
-                tentative_gScore = gScores[current] + self.utilityFunction(message, neighborNode)
+                tentative_gScore = gScores[current] + \
+                    self.utilityFunction(message, neighborNode)
 
                 if tentative_gScore >= gScores[neighbor]:
-                    continue # This is not a better path
+                    continue  # This is not a better path
 
                 # This is the current best path
                 cameFrom[neighbor] = current
                 gScores[neighbor] = tentative_gScore
-                fScores[neighbor] = gScores[neighbor] + self.euclideanDistance(graph, neighbor, message.endingNode)
+                fScores[neighbor] = gScores[neighbor] + \
+                    self.euclideanDistance(graph, neighbor, message.endingNode)
 
-        return False # Signal for failure for now   
-    
+        return False  # Signal for failure for now
+
     def reconstructPath(self, cameFrom, current, graph, message):
         """ Used in the A* algorithm to reconstruct the path """
-        # NOTE: 
+        # NOTE:
         # - returns totalPath = [('node', changeInUtility), ('node', changeInUtility), ...]
         # - the first node in totalPath is the destination, last node is the source
         # - Currently, the receiving node is also charging for the transmission
@@ -123,14 +126,16 @@ class AStarAlgorithm(PathFindingAlgorithm):
 
 class AgentApproach(PathFindingAlgorithm):
     def getPath(self, graph, message):
-        bestBid = {'path': [], 'utility': float('inf'), 'totalCost': float('inf')}
+        bestBid = {'path': [], 'utility': float(
+            'inf'), 'totalCost': float('inf')}
         for neighbor in graph.neighbors(message.startingNode):
             bid = self.getBid(graph, neighbor, message, [message.startingNode])
             if bid['utility'] < bestBid['utility']:
                 bestBid = bid
 
-        bestPath = bestBid['path'] + [(message.startingNode, -1*bestBid['totalCost'])]
-        return bestPath  
+        bestPath = bestBid['path'] + \
+            [(message.startingNode, -1*bestBid['totalCost'])]
+        return bestPath
 
     def getBid(self, graph, current, message, visitedNodes):
         myNode = graph.nodes[current]['node']
@@ -148,15 +153,25 @@ class AgentApproach(PathFindingAlgorithm):
         currentVisitedNodes.append(current)
 
         # Get neighbors best bid
-        bestNeighbor = {'path': [], 'utility': float('inf'), 'totalCost': float('inf')}
-        notVisitedNeighbors = list(set(graph.neighbors(current)) - set(currentVisitedNodes))
+        bestNeighbor = {'path': [], 'utility': float(
+            'inf'), 'totalCost': float('inf')}
+        notVisitedNeighbors = list(
+            set(graph.neighbors(current)) - set(currentVisitedNodes))
         for neighbor in notVisitedNeighbors:
-            neighborsOffer = self.getBid(graph, neighbor, message, currentVisitedNodes)
+            messageSender = message.messageId[0]
+            messageId = message.messageId[1]
+            neighborNode = self.getNode(graph, neighbor)
+            if messageSender not in neighborNode.messagesSeen or messageId != neighborNode.messagesSeen[messageSender]:
+                neighborNode.messagesSeen[messageSender] = messageId
+                neighborNode.numMessagesSeen += 1
+
+            neighborsOffer = self.getBid(
+                graph, neighbor, message, currentVisitedNodes)
             if neighborsOffer['utility'] < bestNeighbor['utility']:
                 bestNeighbor = neighborsOffer
 
         # Now that we have our neighbors best offer, we can add ourself to it
-        myOffer = {'path' : bestNeighbor['path'] + [(current, myCost)],
-                   'utility' : bestNeighbor['utility'] + myUtility,
-                   'totalCost' : bestNeighbor['totalCost'] + myCost}
+        myOffer = {'path': bestNeighbor['path'] + [(current, myCost)],
+                   'utility': bestNeighbor['utility'] + myUtility,
+                   'totalCost': bestNeighbor['totalCost'] + myCost}
         return myOffer
