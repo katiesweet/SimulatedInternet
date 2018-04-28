@@ -186,30 +186,39 @@ class AgentApproximation(PathFindingAlgorithm):
         myNode = self.getNode(graph, currentNode)
         myPrice = myNode.costPerMByte * message.size
 
+        # If the current node is the ending node, we are done
         if currentNode == message.endingNode:
             return True, [(currentNode, myPrice)] # True means reached end
 
-        # Visit current node, and generate current nodes cost and utility
+        # Deep copy currentVisitedNodes, just in case we backtrack
         currentVisitedNodes = copy.deepcopy(visitedNodes)
         currentVisitedNodes.append(currentNode)
 
+        # Loop through each neighbor that hasn't already been visited
+        # and approximate the utility of traveling in that direction
         neighborApproximations = {}
         notVisitedNeighbors = list(
             set(graph.neighbors(currentNode)) - set(currentVisitedNodes))
         for neighbor in notVisitedNeighbors:
             neighborApproximations[neighbor] = self.getApproximateUtility(graph, message, neighbor)
 
+        # Find the neighbor with the minimum approximation and try to find a path from that node.
+        # If there is a valid path to the end node from that neighbor, we are done, just add ourselves.
+        # Otherwise, try going to the next best approximation, until no neighbors are valid
         while len(neighborApproximations) > 0: 
             bestApprox = min(neighborApproximations, key=neighborApproximations.get)
             validPathFound, path = self.findApproximatePath(graph, message, bestApprox, currentVisitedNodes)
             if validPathFound:
                 if currentNode == message.startingNode:
+                    # If a valid path is found from the starting node,
+                    # The price to append on to the path is what it needs pay
                     myPrice = 0
                     for i in range(len(path)):
                         myPrice -= path[i][1] 
                 return True, path + [(currentNode, myPrice)]
             neighborApproximations.pop(bestApprox)
 
+        # There is no valid path from the current node to the goal node
         print('Returned false')
         return False, []
 
