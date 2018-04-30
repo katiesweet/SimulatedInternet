@@ -2,6 +2,7 @@ import csv
 import networkx as nx
 import matplotlib.pyplot as pyplot
 import PathFindingAlgorithm
+import datetime
 
 MIN_MESSAGES_BEFORE_UPDATE = 2
 DECREASE_THRESHOLD = 0.3
@@ -60,11 +61,10 @@ class Message():
 
 
 class Network():
-    def __init__(self):
+    def __init__(self, algorithm, stats):
         self.graph = nx.Graph()
-        self.algorithms = [PathFindingAlgorithm.AStarAlgorithm('A*'),
-                           PathFindingAlgorithm.AgentApproach('Agent'),
-                           PathFindingAlgorithm.AgentApproximation('Approximation')]
+        self.algorithm = algorithm
+        self.stats = stats
 
         with open('Intrinsic.csv') as nodeFile:
             nodes = csv.reader(nodeFile)
@@ -80,22 +80,50 @@ class Network():
 
     def draw(self):
         pos = nx.get_node_attributes(self.graph, 'pos')
-        nx.draw(self.graph, pos, with_labels=True)
+        print(self.graph.nodes)
+        node_colors = [self.mapNodeColor(v) for v in self.graph.nodes()]
+        nx.draw(self.graph, pos, with_labels=True, node_color=node_colors)
         pyplot.show()
 
+    def mapNodeColor(self, node):
+        n = self.graph.node[node]['node']
+        if n.balance >= 1:
+            if n.balance >= 20:
+                return '#16b200'
+            if n.balance >= 15:
+                return '#31d619'
+            if n.balance >= 10:
+                return '#60ed4b'
+            if n.balance >= 5:
+                return '#87f776'
+            return '#beffb5'
+        if n.balance <= -1:
+            if n.balance <= -20:
+                return '#b20808'
+            if n.balance <= -15:
+                return '#ce2d2d'
+            if n.balance <= -10:
+                return '#e05c5c'
+            if n.balance <= -5:
+                return '#f28a8a'
+            return '#ffb4b4'
+        return '#cecece'
+
     def sendMessage(self, start, end, size, content):
-        print("\nSENDING MESSAGE FROM ", start, " TO ", end)
-        for algorithm in self.algorithms:
-            print("\nUsing algorithm type: ", algorithm.name)
-            startNode = self.graph.nodes[start]['node']
-            message = startNode.createMessage(end, size, content)
+        #print("\nSENDING MESSAGE FROM ", start, " TO ", end)
 
-            # Get path
-            path = algorithm.getPath(self.graph, message)
-            print(path)
+        self.stats.startRun()
+        #print("\nUsing algorithm type: ", self.algorithm.name)
+        startNode = self.graph.nodes[start]['node']
+        message = startNode.createMessage(end, size, content)
 
-            if path:
-                self.transmitMessageAndPayment(message, path)
+        # Get path
+        path = self.algorithm.getPath(self.graph, message, self.stats)
+        self.stats.endRun(len(path))
+        #print(path)
+
+        if path:
+            self.transmitMessageAndPayment(message, path)
 
     def transmitMessageAndPayment(self, message, remainingPath):
         if len(remainingPath) <= 0:
@@ -125,39 +153,90 @@ class Network():
             # else
             return self.transmitMessageAndPayment(message, remainingPath)
 
+    def runNetwork(self):
+        a = datetime.datetime.now()
+        self.sendMessage('D', 'M', 1, "Hello!")
+        self.sendMessage('M', 'T', 2, "Hello 2!")
+        self.sendMessage('A', 'C', 1, "Hello!")
+        self.sendMessage('C', 'K', 1, "Hello!")
+        self.sendMessage('L', 'M', 1, "Hello!")
+        self.sendMessage('O', 'M', 1, "Hello!")
+        self.sendMessage('D', 'T', 1, "Hello!")
+        self.sendMessage('T', 'A', 1, "Hello!")
+        self.sendMessage('B', 'R', 1, "Hello!")
+        self.sendMessage('E', 'M', 1, "Hello!")
+        self.sendMessage('C', 'L', 1, "Hello!")
+        self.sendMessage('D', 'K', 1, "Hello!")
+        self.sendMessage('B', 'O', 1, "Hello!")
+        self.sendMessage('D', 'I', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        self.sendMessage('A', 'T', 1, "Hello!")
+        b=datetime.datetime.now()
+        delta = b-a
+        self.stats.recordTime(delta)
 
-network = Network()
+class StatsCollector():
+    def __init__(self):
+        #add run time for algorithm
+        self.totalRuns = 0
+        # Nodes queried per node chosen
+        self.aggregate_NQPNC = 0
+        self.current_run_nodes_queried = 0
+        self.aggregate_path_length = 0
+        self.timeToRun = 0
 
-network.sendMessage('D', 'M', 1, "Hello!")
-network.sendMessage('M', 'T', 2, "Hello 2!")
-network.sendMessage('A', 'C', 1, "Hello!")
-network.sendMessage('C', 'K', 1, "Hello!")
-network.sendMessage('L', 'M', 1, "Hello!")
-network.sendMessage('O', 'M', 1, "Hello!")
-network.sendMessage('D', 'T', 1, "Hello!")
-network.sendMessage('T', 'A', 1, "Hello!")
-network.sendMessage('B', 'R', 1, "Hello!")
-network.sendMessage('E', 'M', 1, "Hello!")
-network.sendMessage('C', 'L', 1, "Hello!")
-network.sendMessage('D', 'K', 1, "Hello!")
-network.sendMessage('B', 'O', 1, "Hello!")
-network.sendMessage('D', 'I', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
-network.sendMessage('A', 'T', 1, "Hello!")
 
-for nodeName in network.graph.nodes:
-    node = network.graph.nodes[nodeName]['node']
-    print(node.name + ": " + str(node.balance))
+    def startRun(self):
+        self.current_run_nodes_queried = 0
 
-network.draw()
+    def visitedNode(self):
+        self.current_run_nodes_queried += 1
+
+    def endRun(self, path_length):
+        self.aggregate_path_length += path_length
+        self.totalRuns += 1
+        self.aggregate_NQPNC += self.current_run_nodes_queried/float(path_length)
+        #print("runs are ", self.totalRuns)
+        #print("nodes queried are ", self.current_run_nodes_queried)
+        #print("path length is", path_length)
+        #print("average is ", self.aggregate_NQPNC/float(self.totalRuns))
+
+    def recordTime(self, timeDif):
+        self.timeToRun = timeDif.total_seconds()
+
+    def printResults(self):
+        print("The results of this test are:")
+        print("The average number of nodes queried per node chosen are " + str(self.aggregate_NQPNC/float(self.totalRuns)))
+        print("The average path length to send a message using this algorithm is " +
+              str(self.aggregate_path_length/float(self.totalRuns)))
+        print("the time it took to run this test was " + str(self.timeToRun) + " seconds")
+        print('\n')
+
+
+algorithms = [PathFindingAlgorithm.AStarAlgorithm('A*'),
+              PathFindingAlgorithm.AgentApproach('Agent'),
+              PathFindingAlgorithm.AgentApproximation('Approximation')]
+
+for a in algorithms:
+    statsCollector = StatsCollector()
+    network = Network(a, statsCollector)
+    network.runNetwork()
+    statsCollector.printResults()
+
+    for nodeName in network.graph.nodes:
+        node = network.graph.nodes[nodeName]['node']
+        print(node.name + ": " + str(node.balance))
+    print('\n\n')
+
+    network.draw()
