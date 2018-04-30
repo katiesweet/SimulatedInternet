@@ -7,7 +7,8 @@ MIN_MESSAGES_BEFORE_UPDATE = 2
 DECREASE_THRESHOLD = 0.3
 INCREASE_THRESHOLD = 0.7
 DECREASE_AMOUNT = 0.1
-INCREASE_AMOUNT = 0.1
+INCREASE_AMOUNT = 0.05
+MIN_PRICE = 0.1
 
 
 class Node():
@@ -45,7 +46,7 @@ class Node():
     def decreasePrice(self):
         self.numMessageSeen = 0
         self.numMessagesTransmitted = 0
-        self.costPerMByte -= DECREASE_AMOUNT
+        self.costPerMByte = max(self.costPerMByte - DECREASE_AMOUNT, MIN_PRICE)
 
 
 class Message():
@@ -66,7 +67,7 @@ class Network():
                            PathFindingAlgorithm.AgentApproach('Agent'),
                            PathFindingAlgorithm.AgentApproximation('Approximation')]
 
-        with open('Intrinsic.csv') as nodeFile:
+        with open('intrinsic.csv') as nodeFile:
             nodes = csv.reader(nodeFile)
             for n in nodes:
                 node = Node(n)
@@ -84,15 +85,15 @@ class Network():
         pyplot.show()
 
     def sendMessage(self, start, end, size, content):
-        print("\nSENDING MESSAGE FROM ", start, " TO ", end)
+        # print("\nSENDING MESSAGE FROM ", start, " TO ", end)
         for algorithm in self.algorithms:
-            print("\nUsing algorithm type: ", algorithm.name)
+            # print("\nUsing algorithm type: ", algorithm.name)
             startNode = self.graph.nodes[start]['node']
             message = startNode.createMessage(end, size, content)
 
             # Get path
             path = algorithm.getPath(self.graph, message)
-            print(path)
+            # print(path)
 
             if path:
                 self.transmitMessageAndPayment(message, path)
@@ -111,9 +112,13 @@ class Network():
         if actualNode.numMessagesSeen > MIN_MESSAGES_BEFORE_UPDATE:
             transmissionRate = actualNode.numMessagesTransmitted / actualNode.numMessagesSeen
 
-            if transmissionRate < DECREASE_THRESHOLD:
+            if actualNode.costPerMByte != MIN_PRICE and transmissionRate < DECREASE_THRESHOLD:
+                print("Decreasing from " + str(format(actualNode.costPerMByte, '.2f')) +
+                      " to " + str(format(actualNode.costPerMByte - DECREASE_AMOUNT, '.2f')))
                 actualNode.decreasePrice()
             elif transmissionRate > INCREASE_THRESHOLD:
+                print("Increasing from " + str(format(actualNode.costPerMByte, '.2f')) +
+                      " to " + str(format(actualNode.costPerMByte + INCREASE_AMOUNT, '.2f')))
                 actualNode.increasePrice()
 
         # Remove yourself from the path
@@ -158,6 +163,6 @@ network.sendMessage('A', 'T', 1, "Hello!")
 
 for nodeName in network.graph.nodes:
     node = network.graph.nodes[nodeName]['node']
-    print(node.name + ": " + str(node.balance))
+    print(node.name + ": " + format(node.balance, '.2f'))
 
-network.draw()
+# network.draw()
