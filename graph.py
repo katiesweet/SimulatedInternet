@@ -8,7 +8,8 @@ MIN_MESSAGES_BEFORE_UPDATE = 2
 DECREASE_THRESHOLD = 0.3
 INCREASE_THRESHOLD = 0.7
 DECREASE_AMOUNT = 0.1
-INCREASE_AMOUNT = 0.1
+INCREASE_AMOUNT = 0.05
+MIN_PRICE = 0.1
 
 
 class Node():
@@ -46,7 +47,7 @@ class Node():
     def decreasePrice(self):
         self.numMessageSeen = 0
         self.numMessagesTransmitted = 0
-        self.costPerMByte -= DECREASE_AMOUNT
+        self.costPerMByte = max(self.costPerMByte - DECREASE_AMOUNT, MIN_PRICE)
 
 
 class Message():
@@ -66,7 +67,7 @@ class Network():
         self.algorithm = algorithm
         self.stats = stats
 
-        with open('Intrinsic.csv') as nodeFile:
+        with open('intrinsic.csv') as nodeFile:
             nodes = csv.reader(nodeFile)
             for n in nodes:
                 node = Node(n)
@@ -139,9 +140,13 @@ class Network():
         if actualNode.numMessagesSeen > MIN_MESSAGES_BEFORE_UPDATE:
             transmissionRate = actualNode.numMessagesTransmitted / actualNode.numMessagesSeen
 
-            if transmissionRate < DECREASE_THRESHOLD:
+            if actualNode.costPerMByte != MIN_PRICE and transmissionRate < DECREASE_THRESHOLD:
+               # print("Decreasing from " + str(format(actualNode.costPerMByte, '.2f')) +
+                      #" to " + str(format(actualNode.costPerMByte - DECREASE_AMOUNT, '.2f')))
                 actualNode.decreasePrice()
             elif transmissionRate > INCREASE_THRESHOLD:
+                #print("Increasing from " + str(format(actualNode.costPerMByte, '.2f')) +
+                      #" to " + str(format(actualNode.costPerMByte + INCREASE_AMOUNT, '.2f')))
                 actualNode.increasePrice()
 
         # Remove yourself from the path
@@ -185,6 +190,12 @@ class Network():
         b=datetime.datetime.now()
         delta = b-a
         self.stats.recordTime(delta)
+        cost = 0
+        for node in self.graph.nodes():
+            n = self.graph.node[node]['node']
+            cost += n.costPerMByte
+        cost /= float(len(self.graph.nodes))
+        self.stats.recordCost(cost)
 
 class StatsCollector():
     def __init__(self):
@@ -195,6 +206,7 @@ class StatsCollector():
         self.current_run_nodes_queried = 0
         self.aggregate_path_length = 0
         self.timeToRun = 0
+        self.averageCostPerMByte = 0
 
 
     def startRun(self):
@@ -207,20 +219,20 @@ class StatsCollector():
         self.aggregate_path_length += path_length
         self.totalRuns += 1
         self.aggregate_NQPNC += self.current_run_nodes_queried/float(path_length)
-        #print("runs are ", self.totalRuns)
-        #print("nodes queried are ", self.current_run_nodes_queried)
-        #print("path length is", path_length)
-        #print("average is ", self.aggregate_NQPNC/float(self.totalRuns))
 
     def recordTime(self, timeDif):
         self.timeToRun = timeDif.total_seconds()
+
+    def recordCost(self, cost):
+        self.averageCostPerMByte = cost;
 
     def printResults(self):
         print("The results of this test are:")
         print("The average number of nodes queried per node chosen are " + str(self.aggregate_NQPNC/float(self.totalRuns)))
         print("The average path length to send a message using this algorithm is " +
               str(self.aggregate_path_length/float(self.totalRuns)))
-        print("the time it took to run this test was " + str(self.timeToRun) + " seconds")
+        print("The time it took to run this test was " + str(self.timeToRun) + " seconds")
+        print("The average cost per MByte per node at the end was " + str(self.averageCostPerMByte))
         print('\n')
 
 
@@ -236,7 +248,7 @@ for a in algorithms:
 
     for nodeName in network.graph.nodes:
         node = network.graph.nodes[nodeName]['node']
-        print(node.name + ": " + str(node.balance))
+        print(node.name + ": " + format(node.balance, '.2f'))
     print('\n\n')
 
     network.draw()
