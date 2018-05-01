@@ -9,7 +9,7 @@ class PathFindingAlgorithm:
         self.name = name
 
     @abstractmethod
-    def getPath(self, graph, message):
+    def getPath(self, graph, message, stats):
         raise NotImplementedError()
 
     def euclideanDistance(self, graph, node1, node2):
@@ -36,7 +36,7 @@ class PathFindingAlgorithm:
 class AStarAlgorithm(PathFindingAlgorithm):
     # Based on the pseudocode given at : https://en.wikipedia.org/wiki/A*_search_algorithm
     # Requires some central understanding
-    def getPath(self, graph, message):
+    def getPath(self, graph, message, stats):
         # Set of nodes already evaluation
         closedSet = []
 
@@ -70,6 +70,8 @@ class AStarAlgorithm(PathFindingAlgorithm):
             currFScores = {node: fScores[node] for node in openSet}
             current = min(currFScores, key=currFScores.get)
 
+            stats.visitedNode()
+
             if current == message.endingNode:
                 return self.reconstructPath(cameFrom, current, graph, message)
 
@@ -79,6 +81,7 @@ class AStarAlgorithm(PathFindingAlgorithm):
             for neighbor in nx.all_neighbors(graph, current):
                 if neighbor in closedSet:
                     continue  # Ignore the neighbor which is already evaluated
+                stats.visitedNode()
 
                 if neighbor not in openSet:
                     openSet.append(neighbor)
@@ -132,11 +135,11 @@ class AStarAlgorithm(PathFindingAlgorithm):
 
 
 class AgentApproach(PathFindingAlgorithm):
-    def getPath(self, graph, message):
+    def getPath(self, graph, message, stats):
         bestBid = {'path': [], 'utility': float(
             'inf'), 'totalCost': float('inf')}
         for neighbor in graph.neighbors(message.startingNode):
-            bid = self.getBid(graph, neighbor, message, [message.startingNode])
+            bid = self.getBid(graph, neighbor, message, [message.startingNode], stats)
             if bid['utility'] < bestBid['utility']:
                 bestBid = bid
 
@@ -144,7 +147,8 @@ class AgentApproach(PathFindingAlgorithm):
             [(message.startingNode, -1*bestBid['totalCost'])]
         return bestPath
 
-    def getBid(self, graph, current, message, visitedNodes):
+    def getBid(self, graph, current, message, visitedNodes, stats):
+        stats.visitedNode()
         myNode = graph.nodes[current]['node']
         myCost = myNode.costPerMByte * message.size
         myUtility = self.utilityFunction(message, myNode)
@@ -174,7 +178,7 @@ class AgentApproach(PathFindingAlgorithm):
                 neighborNode.numMessagesSeen += 1
 
             neighborsOffer = self.getBid(
-                graph, neighbor, message, currentVisitedNodes)
+                graph, neighbor, message, currentVisitedNodes, stats)
             if neighborsOffer['utility'] < bestNeighbor['utility']:
                 bestNeighbor = neighborsOffer
 
@@ -186,12 +190,11 @@ class AgentApproach(PathFindingAlgorithm):
 
 
 class AgentApproximation(PathFindingAlgorithm):
-    def getPath(self, graph, message):
-        validPath, path = self.findApproximatePath(
-            graph, message, message.startingNode, [])
+    def getPath(self, graph, message, stats):
+        validPath, path = self.findApproximatePath(graph, message, message.startingNode, [], stats)
         return path
 
-    def findApproximatePath(self, graph, message, currentNode, visitedNodes):
+    def findApproximatePath(self, graph, message, currentNode, visitedNodes, stats):
         myNode = self.getNode(graph, currentNode)
         myPrice = myNode.costPerMByte * message.size
 
@@ -214,6 +217,7 @@ class AgentApproximation(PathFindingAlgorithm):
         for neighbor in notVisitedNeighbors:
             neighborApproximations[neighbor] = self.getApproximateUtility(
                 graph, message, neighbor)
+            stats.visitedNode()
 
             neighborNode = self.getNode(graph, neighbor)
             if messageSender not in neighborNode.messagesSeen or messageId != neighborNode.messagesSeen[messageSender]:
@@ -227,7 +231,7 @@ class AgentApproximation(PathFindingAlgorithm):
             bestApprox = min(neighborApproximations,
                              key=neighborApproximations.get)
             validPathFound, path = self.findApproximatePath(
-                graph, message, bestApprox, currentVisitedNodes)
+                graph, message, bestApprox, currentVisitedNodes, stats)
             if validPathFound:
                 if currentNode == message.startingNode:
                     # If a valid path is found from the starting node,
